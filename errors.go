@@ -24,6 +24,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	"go.uber.org/multierr"
 )
 
 // As is a proxy for the standard library's errors.As.
@@ -123,8 +125,7 @@ func Wrap(base error, msg string) error {
 // includes the interpolation of all sprintf placeholders and variables, in
 // order to provide the consistent and coherent layering of errors.
 //
-// Note that msg must not contain either the formatting verb %w nor its escaped
-// version, %%w.
+// Wrapf supports wrapping errors with the %w verb.
 //
 // If base is nil, Wrapf returns a nil error. If msg is an empty string and
 // args is empty, base is returned verbatim.
@@ -135,6 +136,38 @@ func Wrapf(base error, msg string, args ...any) error {
 	case len(msg) == 0 && len(args) == 0:
 		return base
 	default:
-		return fmt.Errorf("%s: %w", fmt.Sprintf(msg, args...), base)
+		tmp := make([]any, len(args)+1)
+		copy(tmp, args)
+		tmp[len(tmp)-1] = base
+
+		return fmt.Errorf(msg+": %w", tmp...)
 	}
+}
+
+// Append returns a combined error with right appended to left. If either is
+// nil, the other is returned verbatim.
+func Append(left error, right error) error {
+	return multierr.Append(left, right)
+}
+
+// Combine returns a combined error with each successive error appended to the
+// previous errors. If an error is nil, it is omitted. If all errors are nil,
+// or if errs is empty, nil is returned.
+func Combine(errs ...error) error {
+	return multierr.Combine(errs...)
+}
+
+// WrapAppend is syntactic sugar for Wrap(Append(left, right), msg).
+func WrapAppend(left error, right error, msg string) error {
+	return Wrap(Append(left, right), msg)
+}
+
+// WrapfAppend is syntactic sugar for Wrapf(Append(left, right), msg, args...).
+func WrapfAppend(left error, right error, msg string, args ...any) error {
+	return Wrapf(Append(left, right), msg, args...)
+}
+
+// WrapCombine is syntactic sugar for Wrap(Combine(errs...), msg).
+func WrapCombine(msg string, errs ...error) error {
+	return Wrap(Combine(errs...), msg)
 }
