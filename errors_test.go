@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Matt Way
+// Copyright (c) 2023 Matt Way
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -21,6 +21,7 @@
 package errors_test
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -290,6 +291,306 @@ func TestWrapf(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJoinFuncs(t *testing.T) {
+	var (
+		errA    = errors.New("a")
+		errB    = errors.New("b")
+		errC    = errors.New("c")
+		errFunc = func(err error) func() error {
+			return func() error { return err }
+		}
+	)
+
+	cases := map[string]struct {
+		give []errors.ErrorFunc
+		want []error
+	}{
+		"nominal": {
+			give: []errors.ErrorFunc{
+				errFunc(errA),
+				errFunc(errB),
+				errFunc(errC),
+			},
+			want: []error{
+				errA,
+				errB,
+				errC,
+			},
+		},
+		"no errors": {
+			give: []errors.ErrorFunc{
+				errFunc(nil),
+				errFunc(nil),
+				errFunc(nil),
+			},
+			want: nil,
+		},
+		"single error": {
+			give: []errors.ErrorFunc{
+				errFunc(errA),
+				errFunc(nil),
+				errFunc(nil),
+			},
+			want: []error{
+				errA,
+			},
+		},
+		"nils": {
+			give: []errors.ErrorFunc{
+				nil,
+				nil,
+				nil,
+			},
+			want: nil,
+		},
+		"interspersed": {
+			give: []errors.ErrorFunc{
+				nil,
+				errFunc(errA),
+				nil,
+				errFunc(errB),
+				nil,
+				errFunc(nil),
+				errFunc(errC),
+				errFunc(nil),
+			},
+			want: []error{
+				errA,
+				errB,
+				errC,
+			},
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			haveErr := errors.JoinFuncs(tt.give...)
+			for _, wantErr := range tt.want {
+				require.ErrorIs(t, haveErr, wantErr)
+			}
+
+			if len(tt.want) == 0 {
+				require.NoError(t, haveErr)
+			}
+		})
+	}
+}
+
+func TestAppendFunc(t *testing.T) {
+	cases := map[string]struct {
+		lower     error
+		upper     error
+		wantLower bool
+		wantUpper bool
+	}{
+		"non-nil lower and upper": {
+			lower:     errors.New("a"),
+			upper:     errors.New("b"),
+			wantLower: true,
+			wantUpper: true,
+		},
+		"nil lower": {
+			lower:     nil,
+			upper:     errors.New("b"),
+			wantLower: false,
+			wantUpper: true,
+		},
+		"nil upper": {
+			lower:     errors.New("a"),
+			upper:     nil,
+			wantLower: true,
+			wantUpper: false,
+		},
+		"nil lower and upper": {
+			lower:     nil,
+			upper:     nil,
+			wantLower: true,
+			wantUpper: true,
+		},
+	}
+
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			haveErr := errors.AppendFunc(tt.lower, func() error {
+				return tt.upper
+			})
+			require.Equal(t, tt.wantLower, errors.Is(haveErr, tt.lower))
+			require.Equal(t, tt.wantUpper, errors.Is(haveErr, tt.upper))
+		})
+	}
+
+	t.Run("nil func", func(t *testing.T) {
+		var (
+			wantErr = errors.New("lower")
+			haveErr = errors.AppendFunc(wantErr, nil)
+		)
+
+		require.ErrorIs(t, haveErr, wantErr)
+		require.Equal(t, fmt.Sprintf("%p", wantErr), fmt.Sprintf("%p", haveErr))
+	})
+}
+
+func TestAppendFuncs(t *testing.T) {
+	cases := map[string]struct {
+		lower     error
+		upper     []error
+		wantLower bool
+		wantUpper []bool
+	}{
+		"non-nil lower and uppers": {
+			lower: errors.New("a"),
+			upper: []error{
+				errors.New("b"),
+				errors.New("c"),
+				errors.New("d"),
+			},
+			wantLower: true,
+			wantUpper: []bool{
+				true, // b
+				true, // c
+				true, // d
+			},
+		},
+		"non-nil lower and no uppers": {
+			lower:     errors.New("a"),
+			upper:     nil,
+			wantLower: true,
+			wantUpper: nil,
+		},
+		"non-nil lower and nil uppers": {
+			lower: errors.New("a"),
+			upper: []error{
+				nil, // b
+				nil, // c
+				nil, // d
+			},
+			wantLower: true,
+			wantUpper: []bool{
+				false, // b
+				false, // c
+				false, // d
+			},
+		},
+		"non-nil lower and mixed uppers": {
+			lower: errors.New("a"),
+			upper: []error{
+				errors.New("b"),
+				nil, // c
+				errors.New("d"),
+			},
+			wantLower: true,
+			wantUpper: []bool{
+				true,  // b
+				false, // c
+				true,  // d
+			},
+		},
+		"nil lower and no uppers": {
+			lower:     nil,
+			upper:     nil,
+			wantLower: true,
+			wantUpper: nil,
+		},
+		"nil lower and nil uppers": {
+			lower: nil, // a
+			upper: []error{
+				nil, // b
+				nil, // c
+				nil, // d
+			},
+			wantLower: true, // a
+			wantUpper: []bool{
+				true, // b
+				true, // c
+				true, // d
+			},
+		},
+		"nil lower and non-nil uppers": {
+			lower: nil,
+			upper: []error{
+				errors.New("b"),
+				errors.New("c"),
+				errors.New("d"),
+				errors.New("e"),
+				errors.New("f"),
+			},
+			wantLower: false,
+			wantUpper: []bool{
+				true, // b
+				true, // c
+				true, // d
+				true, // e
+				true, // f
+			},
+		},
+	}
+
+	for name, tt := range cases {
+		require.Equal(t, len(tt.upper), len(tt.wantUpper)) // meta
+
+		t.Run(name, func(t *testing.T) {
+			var fns []errors.ErrorFunc
+			for _, upper := range tt.upper {
+				upper := upper
+				fns = append(fns, func() error { return upper })
+			}
+
+			haveErr := errors.AppendFuncs(tt.lower, fns...)
+			require.Equal(t, tt.wantLower, errors.Is(haveErr, tt.lower))
+
+			for i, want := range tt.wantUpper {
+				require.Equal(t, want, errors.Is(haveErr, tt.upper[i]))
+			}
+		})
+	}
+}
+
+func TestLazy_Is(t *testing.T) {
+	var (
+		errA    = errors.New("explicit error")
+		errB    = errors.New("lazy error")
+		errFunc = errors.Lazy(func() error {
+			return errB
+		})
+		haveErr = errors.Join(errA, errFunc)
+	)
+
+	require.ErrorIs(t, haveErr, errA)
+	require.ErrorIs(t, haveErr, errB)
+}
+
+func TestLazy_As(t *testing.T) {
+	err := errors.Lazy(func() error {
+		return testError(t.Name())
+	})
+
+	var dst testError
+	require.True(t, errors.As(err, &dst))
+	require.Equal(t, t.Name(), string(dst))
+}
+
+func TestLazy_Unwrap(t *testing.T) {
+	err := errors.Lazy(func() error {
+		return fmt.Errorf("wrapped: %w", testError(t.Name()))
+	})
+
+	unwrapped := errors.Unwrap(err)
+	require.Error(t, unwrapped)
+	require.ErrorContains(t, unwrapped, t.Name())
+	require.NotContains(t, unwrapped.Error(), "wrapped")
+
+	var dst testError
+	require.True(t, errors.As(err, &dst))
+	require.Equal(t, t.Name(), string(dst))
+}
+
+func TestLazy_Error(t *testing.T) {
+	err := errors.Lazy(func() error {
+		return testError(t.Name())
+	})
+	require.Equal(t, t.Name(), err.Error())
 }
 
 func newChain(size int) []error {

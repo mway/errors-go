@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Matt Way
+// Copyright (c) 2023 Matt Way
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -24,7 +24,11 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
+
+// An ErrorFunc is a function that returns an error.
+type ErrorFunc = func() error
 
 // As is a proxy for the standard library's errors.As.
 //
@@ -146,4 +150,133 @@ func Wrapf(base error, msg string, args ...any) error {
 
 		return fmt.Errorf(msg+": %w", tmp...)
 	}
+}
+
+// JoinFuncs evaluates fns serially, joining all non-nil return values and
+// returning the resulting error. If fns is empty or if all fns return nil,
+// nil is returned; if only one error is produced, it is returned verbatim.
+// Otherwise, the resulting errors are joined with [Join].
+func JoinFuncs(fns ...ErrorFunc) error {
+	var total int
+	for _, fn := range fns {
+		if fn != nil {
+			total++
+		}
+	}
+	if total == 0 {
+		return nil
+	}
+
+	var (
+		tmp  [4]error
+		errs = tmp[:0]
+	)
+	if cap(errs) < total {
+		errs = make([]error, 0, total)
+	}
+
+	for _, fn := range fns {
+		if fn != nil {
+			if err := fn(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		return Join(errs...)
+	}
+}
+
+// AppendFunc evaluates fn and appends it to err. If either err or fn are nil,
+// the other is returned. If fn returns a nil error, err is returned.
+func AppendFunc(err error, fn ErrorFunc) error {
+	switch {
+	case fn == nil:
+		return err
+	case err == nil:
+		return fn()
+	default:
+		if e := fn(); e != nil {
+			return errors.Join(err, e)
+		}
+		return err
+	}
+}
+
+// AppendFuncs evaluates fns serially, appending each return value to err. Nil
+// errors are ignored. If err and fns produce no non-nil errors, nil is
+// returned; if only one non-nil error is produced, it is returned verbatim.
+// Otherwise, the resulting non-nil errors are joined with [Join].
+func AppendFuncs(err error, fns ...ErrorFunc) error {
+	if len(fns) == 0 {
+		return err
+	}
+
+	var (
+		tmp  [4]error
+		errs = tmp[:0]
+	)
+
+	total := len(fns)
+	if err != nil {
+		total++
+	}
+	if cap(errs) < total {
+		errs = make([]error, 0, total)
+	}
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	for _, fn := range fns {
+		if fn != nil {
+			if e := fn(); e != nil {
+				errs = append(errs, e)
+			}
+		}
+	}
+
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		return Join(errs...)
+	}
+}
+
+// Lazy returns an error that will lazily evaluate fn; that is, fn will be
+// called at most once, and not until the resulting error would be used.
+func Lazy(fn ErrorFunc) error {
+	return &lazyError{
+		get: sync.OnceValue(fn),
+	}
+}
+
+type lazyError struct {
+	get ErrorFunc
+}
+
+func (e lazyError) As(target any) bool {
+	return errors.As(e.get(), target)
+}
+
+func (e lazyError) Is(target error) bool {
+	return errors.Is(e.get(), target)
+}
+
+func (e lazyError) Unwrap() error {
+	return errors.Unwrap(e.get())
+}
+
+func (e lazyError) Error() string {
+	return e.get().Error()
 }
