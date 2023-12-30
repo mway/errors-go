@@ -24,8 +24,6 @@ package errors
 import (
 	"errors"
 	"fmt"
-
-	"go.uber.org/multierr"
 )
 
 // As is a proxy for the standard library's errors.As.
@@ -71,6 +69,12 @@ func As(err error, target any) bool {
 // err and the target and not call Unwrap on either.
 func Is(err error, target error) bool {
 	return errors.Is(err, target)
+}
+
+// Join combines all given errors into a single error. Any nil values are
+// discarded.
+func Join(errs ...error) error {
+	return errors.Join(errs...)
 }
 
 // New is a proxy for the standard library's errors.New.
@@ -142,32 +146,4 @@ func Wrapf(base error, msg string, args ...any) error {
 
 		return fmt.Errorf(msg+": %w", tmp...)
 	}
-}
-
-// Append returns a combined error with right appended to left. If either is
-// nil, the other is returned verbatim.
-func Append(left error, right error) error {
-	return multierr.Append(left, right)
-}
-
-// Combine returns a combined error with each successive error appended to the
-// previous errors. If an error is nil, it is omitted. If all errors are nil,
-// or if errs is empty, nil is returned.
-func Combine(errs ...error) error {
-	return multierr.Combine(errs...)
-}
-
-// WrapAppend is syntactic sugar for Wrap(Append(left, right), msg).
-func WrapAppend(left error, right error, msg string) error {
-	return Wrap(Append(left, right), msg)
-}
-
-// WrapfAppend is syntactic sugar for Wrapf(Append(left, right), msg, args...).
-func WrapfAppend(left error, right error, msg string, args ...any) error {
-	return Wrapf(Append(left, right), msg, args...)
-}
-
-// WrapCombine is syntactic sugar for Wrap(Combine(errs...), msg).
-func WrapCombine(msg string, errs ...error) error {
-	return Wrap(Combine(errs...), msg)
 }
