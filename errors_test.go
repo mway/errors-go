@@ -173,6 +173,17 @@ func TestNewf(t *testing.T) {
 	}
 }
 
+func TestJoin(t *testing.T) {
+	var (
+		errA = errors.New("foo")
+		errB = errors.New("bar")
+		err  = errors.Join(errA, errB)
+	)
+
+	require.ErrorIs(t, err, errA)
+	require.ErrorIs(t, err, errB)
+}
+
 func TestUnwrap(t *testing.T) {
 	var (
 		errs = newChain(128)
