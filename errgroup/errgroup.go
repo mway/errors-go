@@ -44,9 +44,9 @@ type (
 // Groups cannot be reused. A zero-value Group is valid and ready to use.
 type Group struct {
 	err     error
+	options Options
 	mu      sync.Mutex
 	wg      sync.WaitGroup
-	options Options
 }
 
 // New creates a new Group with the given options.

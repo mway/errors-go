@@ -85,8 +85,8 @@ func Join(errs ...error) error {
 //
 // New returns an error that formats as the given text. Each call to New
 // returns a distinct error value even if the text is identical.
-func New(text string) error {
-	return errors.New(text)
+func New(msg string) error {
+	return errors.New(msg)
 }
 
 // Newf is a proxy for the standard library's fmt.Errorf.
@@ -99,8 +99,8 @@ func New(text string) error {
 // invalid to include more than one %w verb or to supply it with an operand
 // that does not implement the error interface. The %w verb is otherwise a
 // synonym for %v.
-func Newf(text string, args ...any) error {
-	return fmt.Errorf(text, args...)
+func Newf(msg string, args ...any) error {
+	return fmt.Errorf(msg, args...)
 }
 
 // Unwrap is a proxy for the standard library's errors.Unwrap.

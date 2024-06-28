@@ -134,34 +134,34 @@ func TestNew(t *testing.T) {
 
 func TestNewf(t *testing.T) {
 	cases := []struct {
+		want        string
 		giveMessage string
 		giveArgs    []any
-		want        string
 	}{
 		{
+			want:        "",
 			giveMessage: "",
 			giveArgs:    nil,
-			want:        "",
 		},
 		{
+			want:        "hello",
 			giveMessage: "hello",
 			giveArgs:    nil,
-			want:        "hello",
 		},
 		{
+			want:        "hello world",
 			giveMessage: "hello %s",
 			giveArgs:    []any{"world"},
-			want:        "hello world",
 		},
 		{
+			want:        "expired after 1s",
 			giveMessage: "expired after %v",
 			giveArgs:    []any{time.Second},
-			want:        "expired after 1s",
 		},
 		{
+			want:        "upstream said \"something\"",
 			giveMessage: "upstream said %q",
 			giveArgs:    []any{"something"},
-			want:        "upstream said \"something\"",
 		},
 	}
 
@@ -206,26 +206,26 @@ func TestWrap(t *testing.T) {
 	cases := []struct {
 		giveErr     error
 		giveMessage string
-		wantNil     bool
 		wantMessage string
+		wantNil     bool
 	}{
 		{
 			giveErr:     errors.New("world"),
 			giveMessage: "hello",
-			wantNil:     false,
 			wantMessage: "hello: world",
+			wantNil:     false,
 		},
 		{
 			giveErr:     nil,
 			giveMessage: "hello",
-			wantNil:     true,
 			wantMessage: "",
+			wantNil:     true,
 		},
 		{
 			giveErr:     errors.New("hello world"),
 			giveMessage: "",
-			wantNil:     false,
 			wantMessage: "hello world",
+			wantNil:     false,
 		},
 	}
 
@@ -245,10 +245,10 @@ func TestWrap(t *testing.T) {
 func TestWrapf(t *testing.T) {
 	cases := []struct {
 		giveErr     error
+		wantMessage string
 		giveMessage string
 		giveArgs    []any
 		wantNil     bool
-		wantMessage string
 	}{
 		{
 			giveErr:     errors.New("world"),
@@ -436,8 +436,8 @@ func TestAppendFuncs(t *testing.T) {
 	cases := map[string]struct {
 		lower     error
 		upper     []error
-		wantLower bool
 		wantUpper []bool
+		wantLower bool
 	}{
 		"non-nil lower and uppers": {
 			lower: errors.New("a"),
@@ -446,18 +446,18 @@ func TestAppendFuncs(t *testing.T) {
 				errors.New("c"),
 				errors.New("d"),
 			},
-			wantLower: true,
 			wantUpper: []bool{
 				true, // b
 				true, // c
 				true, // d
 			},
+			wantLower: true,
 		},
 		"non-nil lower and no uppers": {
 			lower:     errors.New("a"),
 			upper:     nil,
-			wantLower: true,
 			wantUpper: nil,
+			wantLower: true,
 		},
 		"non-nil lower and nil uppers": {
 			lower: errors.New("a"),
@@ -466,12 +466,12 @@ func TestAppendFuncs(t *testing.T) {
 				nil, // c
 				nil, // d
 			},
-			wantLower: true,
 			wantUpper: []bool{
 				false, // b
 				false, // c
 				false, // d
 			},
+			wantLower: true,
 		},
 		"non-nil lower and mixed uppers": {
 			lower: errors.New("a"),
@@ -480,18 +480,18 @@ func TestAppendFuncs(t *testing.T) {
 				nil, // c
 				errors.New("d"),
 			},
-			wantLower: true,
 			wantUpper: []bool{
 				true,  // b
 				false, // c
 				true,  // d
 			},
+			wantLower: true,
 		},
 		"nil lower and no uppers": {
 			lower:     nil,
 			upper:     nil,
-			wantLower: true,
 			wantUpper: nil,
+			wantLower: true,
 		},
 		"nil lower and nil uppers": {
 			lower: nil, // a
@@ -500,12 +500,12 @@ func TestAppendFuncs(t *testing.T) {
 				nil, // c
 				nil, // d
 			},
-			wantLower: true, // a
 			wantUpper: []bool{
 				true, // b
 				true, // c
 				true, // d
 			},
+			wantLower: true, // a
 		},
 		"nil lower and non-nil uppers": {
 			lower: nil,
@@ -516,7 +516,6 @@ func TestAppendFuncs(t *testing.T) {
 				errors.New("e"),
 				errors.New("f"),
 			},
-			wantLower: false,
 			wantUpper: []bool{
 				true, // b
 				true, // c
@@ -524,6 +523,7 @@ func TestAppendFuncs(t *testing.T) {
 				true, // e
 				true, // f
 			},
+			wantLower: false,
 		},
 	}
 
