@@ -2,12 +2,12 @@ package errgroup
 
 // Options are used to configure a Group.
 type Options struct {
-	// FirstOnly controls whether only the first non-nil error encountered will
-	// be returned, or if all errors will be appended in a chain and returned.
-	FirstOnly bool
 	// IgnoredErrors is used to filter out unhelpful or immaterial errors,
 	// such as io.EOF.
 	IgnoredErrors []error
+	// FirstOnly controls whether only the first non-nil error encountered will
+	// be returned, or if all errors will be appended in a chain and returned.
+	FirstOnly bool
 	// Inline controls whether functions passed to Group.Add are handled
 	// inline and serially in the calling goroutine, or if they will be
 	// executed in parallel in a background goroutine. Note that if Inline
@@ -19,8 +19,9 @@ type Options struct {
 // Options verbatim is functionally equivalent to using a zero-value Group.
 func DefaultOptions() Options {
 	return Options{
-		FirstOnly: false,
-		Inline:    false,
+		IgnoredErrors: nil,
+		FirstOnly:     false,
+		Inline:        false,
 	}
 }
 
